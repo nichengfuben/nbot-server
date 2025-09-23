@@ -1,2 +1,6 @@
 quart
 quart_cors
+aiohttp
+requests
+numpy
+pynput

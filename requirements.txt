@@ -1,6 +1,5 @@
 fastapi==0.115.8
 uvicorn==0.35.0
-pydantic==2.10.6
 aiohttp==3.11.13
 aiofiles==24.1.0
 numpy==2.2.3

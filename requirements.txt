@@ -1,16 +1,133 @@
-quart
-quart_cors
-aiohttp
-requests
-numpy
-pynput
-rich
-wcwidth
-datetime
-ollama
-fastapi==0.104.1
-uvicorn==0.24.0
-python-multipart==0.0.6
-aiofiles==23.2.1
-aiohttp==3.9.1
-pydantic==2.5.0
+# 项目依赖列表 - 包含所有代码文件中使用到的库
+# 生成时间: 2025-08-19
+
+# Web框架
+fastapi==0.115.8
+uvicorn==0.35.0
+pydantic==2.10.6
+starlette==0.47.1
+
+# 异步HTTP客户端
+aiohttp==3.11.13
+aiofiles==24.1.0
+
+# 数据处理和科学计算
+numpy==2.2.3
+pandas==2.2.3
+scipy==1.16.0
+scikit-learn==1.7.0
+
+# 机器学习和AI
+ollama==0.4.7
+torch==2.7.1
+torchvision==0.22.1
+torchaudio==2.7.1
+transformers==4.53.0
+tiktoken==0.11.0
+tokenizers==0.21.2
+together==1.5.25
+cerebras_cloud_sdk==1.24.0
+
+# 日志和监控
+logging==0.4.9.6
+structlog==25.4.0
+
+# 终端UI和富文本
+rich==13.9.4
+wcwidth==0.2.13
+pynput==1.7.7
+
+# 文件处理
+mimetypes==0.5.6
+pathlib2==2.3.7
+
+# 网络请求
+requests==2.32.3
+urllib3==2.4.0
+
+# 数据序列化
+json5==0.10.0
+pickle5==0.0.12
+
+# 加密和安全
+hashlib2==1.0.5
+base64==1.0.0
+hmac==1.0.0
+
+# 日期时间
+python-dateutil==2.9.0
+pytz==2025.2
+tzdata==2025.2
+
+# 系统工具
+os-sys==2.1.4
+sys-path==0.3.0
+subprocess.run==0.1.1
+
+# 并发和多线程
+asyncio==3.4.3
+threading2==0.1.2
+concurrent.futures==3.1.1
+
+# 随机数生成
+random2==1.0.2
+
+# 正则表达式
+regex==2024.11.6
+
+# 数学运算
+math3d==0.6.3
+
+# UUID生成
+uuid==1.30
+
+# 命令行参数解析
+argparse==1.4.0
+
+# 数据类支持
+dataclasses==0.6
+
+# 类型注解
+typing-extensions==4.14.1
+
+# 音频处理
+soundfile==0.13.1
+librosa==0.10.2
+
+# 图像处理
+Pillow==11.1.0
+opencv-python==4.11.0.86
+
+# 数据库
+SQLAlchemy==2.0.43
+
+# Web自动化
+selenium==4.34.0
+webdriver-manager==4.0.2
+
+# 其他工具
+beautifulsoup4==4.13.3
+lxml==5.3.0
+certifi==2025.1.31
+charset-normalizer==3.4.1
+idna==3.10
+six==1.17.0
+packaging==24.2
+filelock==3.17.0
+fsspec==2024.12.0
+safetensors==0.5.3
+huggingface-hub==0.28.1
+tqdm==4.67.1
+pyyaml==6.0.2
+markdown==3.7
+bleach==6.2.0
+jinja2==3.1.5
+markupsafe==3.0.2
+sympy==1.14.0
+networkx==3.4.2
+mpld3==0.5.10
+matplotlib==3.10.0
+seaborn==0.13.2
+plotly==6.0.0
+streamlit==1.42.0
+gradio==5.15.0

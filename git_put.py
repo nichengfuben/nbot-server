@@ -1,7 +1,7 @@
 import subprocess
 import os
 
-os.chdir(r"E:\我的\python\new\Nbot0.4.0 - SERVER")
+os.chdir(r"E:\我的\python\new\MODEL - SERVER")
 
 commands = [
     "git init",

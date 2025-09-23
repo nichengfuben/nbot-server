@@ -4,6 +4,12 @@ aiohttp
 requests
 numpy
 pynput
+rich
+wcwidth
+datetime
+os
+sys
+asyncio
 fastapi==0.104.1
 uvicorn==0.24.0
 python-multipart==0.0.6

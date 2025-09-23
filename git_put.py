@@ -8,6 +8,7 @@ commands = [
     "git add .",
     "git commit -m \"first commit\"",
     "git branch -M main",
+    "git remote add origin https://github.com/nichengfuben/nbot_api.git",
     "git pull https://github.com/nichengfuben/nbot_api.git",
     "git push -u origin main"
 ]

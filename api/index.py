@@ -1,6 +1,7 @@
-# index.py - Vercel Compatible Version
-from quart import Quart, request, jsonify, Response
-from quart_cors import cors
+#index.py
+from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Form
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import json
 import uuid
@@ -16,15 +17,14 @@ import logging
 import aiohttp
 import base64
 from pathlib import Path
+from pydantic import BaseModel
 
-# Vercel兼容的导入处理
+# 直接集成所有客户端逻辑
 import sys
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 尝试导入客户端模块，使用相对导入
 try:
-    # 尝试相对导入
     from client.qwen_client import quick_chat, quick_stream, cleanup_client as qwen_cleanup
     from client.chutes_client import quick_chat as chutes_chat, quick_chat_stream as chutes_stream
     from client.minimax_client import chat_non_stream as minimax_chat, chat_stream as minimax_stream
@@ -34,106 +34,51 @@ try:
     from client.embed_client import EmbedClient
     from client.openrouter_client import quick_chat as openrouter_chat, quick_chat_stream as openrouter_stream
     from client.cerebras_client import quick_chat as cerebras_chat, quick_chat_stream as cerebras_stream
-except ImportError:
-    try:
-        # 尝试绝对导入
-        import client.qwen_client as qwen_module
-        quick_chat = qwen_module.quick_chat
-        quick_stream = qwen_module.quick_stream
-        qwen_cleanup = qwen_module.cleanup_client
-        
-        import client.chutes_client as chutes_module
-        chutes_chat = chutes_module.quick_chat
-        chutes_stream = chutes_module.quick_chat_stream
-        
-        import client.minimax_client as minimax_module
-        minimax_chat = minimax_module.chat_non_stream
-        minimax_stream = minimax_module.chat_stream
-        
-        from client.ollama_client import OllamaClient
-        from client.suanli_client import SuanliClient
-        from client.tts_client import tts
-        from client.embed_client import EmbedClient
-        
-        import client.openrouter_client as openrouter_module
-        openrouter_chat = openrouter_module.quick_chat
-        openrouter_stream = openrouter_module.quick_chat_stream
-        
-        import client.cerebras_client as cerebras_module
-        cerebras_chat = cerebras_module.quick_chat
-        cerebras_stream = cerebras_module.quick_chat_stream
-        
-    except ImportError as e:
-        print(f"导入客户端模块失败: {e}")
-        print("使用模拟客户端进行兼容")
-        
-        # 创建模拟函数以保证应用能启动
-        async def quick_chat(text, files=None):
-            return f"模拟回复: {text[:100]}..."
-        
-        async def quick_stream(text, files=None):
-            for chunk in ["模拟", "流式", "回复"]:
-                yield chunk
-        
-        def qwen_cleanup():
-            pass
-        
-        async def chutes_chat(text):
-            return f"Chutes模拟回复: {text[:100]}..."
-        
-        async def chutes_stream(text):
-            for chunk in ["Chutes", "流式", "回复"]:
-                yield chunk
-        
-        async def minimax_chat(text, image=None):
-            return f"Minimax模拟回复: {text[:100]}..."
-        
-        async def minimax_stream(text, image=None):
-            for chunk in ["Minimax", "流式", "回复"]:
-                yield chunk
-        
-        class OllamaClient:
-            async def chat(self, text):
-                return f"Ollama模拟回复: {text[:100]}..."
-            
-            async def chat_stream(self, text):
-                for chunk in ["Ollama", "流式", "回复"]:
-                    yield chunk
-        
-        class SuanliClient:
-            def chat(self, text, show_stats=False):
-                return f"Suanli模拟回复: {text[:100]}...", {}
-            
-            def chat_stream_generator(self, text, show_stats=False):
-                for chunk in ["Suanli", "流式", "回复"]:
-                    yield chunk
-        
-        def tts(text, voice="派蒙", save_path=None):
-            return {"status": "success", "message": "TTS模拟完成"}
-        
-        class EmbedClient:
-            def get_embedding(self, text):
-                return [0.1] * 1536  # 模拟嵌入向量
-        
-        async def openrouter_chat(text, image=""):
-            return f"OpenRouter模拟回复: {text[:100]}..."
-        
-        async def openrouter_stream(text, image=""):
-            for chunk in ["OpenRouter", "流式", "回复"]:
-                yield chunk
-        
-        async def cerebras_chat(text):
-            return f"Cerebras模拟回复: {text[:100]}..."
-        
-        async def cerebras_stream(text):
-            for chunk in ["Cerebras", "流式", "回复"]:
-                yield chunk
+except ImportError as e:
+    print(f"导入客户端模块失败: {e}")
+    print("请确保所有客户端模块都存在")
 
 logging.basicConfig(level=logging.INFO)
+
 logger = logging.getLogger(__name__)
 
-app = Quart(__name__)
-app = cors(app)
+app = FastAPI(title="OpenAI & Anthropic Compatible API", version="2.2.0")
+
+# 配置CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Pydantic 模型定义
+class Message(BaseModel):
+    role: str
+    content: Union[str, List[Dict[str, Any]]]
+
+class ChatCompletionRequest(BaseModel):
+    model: str = "auto_chat"
+    messages: List[Message]
+    stream: bool = False
+    max_tokens: Optional[int] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    options: Optional[Dict[str, Any]] = {}
+
+class AnthropicMessage(BaseModel):
+    role: str
+    content: Union[str, List[Dict[str, Any]]]
+
+class AnthropicRequest(BaseModel):
+    model: str = "auto_chat"
+    messages: List[AnthropicMessage]
+    max_tokens: int = 1048576
+    stream: bool = False
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    options: Optional[Dict[str, Any]] = {}
 
 class ModelConfig:
     """模型配置类 - 定义各种AI模型的能力和限制"""
@@ -400,8 +345,8 @@ class ClientHandler:
         self.embed_client = None
         self._client_lock = threading.Lock()
         
-        # Vercel兼容的临时文件管理
-        self.temp_dir = '/tmp' if os.path.exists('/tmp') else tempfile.gettempdir()
+        # 临时文件管理 - 使用系统临时目录
+        self.temp_dir = tempfile.gettempdir()
         self.temp_files = set()
         self._temp_lock = threading.Lock()
         
@@ -955,6 +900,11 @@ class ClientHandler:
         with self._temp_lock:
             for file_path in list(self.temp_files):
                 self._remove_temp_file(file_path)
+        
+        try:
+            await qwen_cleanup()
+        except:
+            pass
 
 # 全局处理器实例
 _global_handler = None
@@ -1138,7 +1088,7 @@ def extract_files_from_messages(messages: List[Dict], format_type: str = "openai
                                 else:
                                     ext = 'bin'
                                 
-                                temp_path = os.path.join('/tmp' if os.path.exists('/tmp') else tempfile.gettempdir(), f"{uuid.uuid4().hex}.{ext}")
+                                temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.{ext}")
                                 try:
                                     with open(temp_path, 'wb') as f:
                                         f.write(base64.b64decode(data))
@@ -1148,42 +1098,49 @@ def extract_files_from_messages(messages: List[Dict], format_type: str = "openai
     
     return file_urls
 
-@app.route('/v1/chat/completions', methods=['POST'])
-async def chat_completions():
+@app.post("/v1/chat/completions")
+async def chat_completions(
+    request: Request,
+    chat_request: Optional[ChatCompletionRequest] = None,
+    files: List[UploadFile] = File(default=[])
+):
     """OpenAI兼容的聊天完成API - 支持多模型调用和文件处理"""
     temp_files = []
     try:
-        data = await request.get_json()
-        # 验证必需参数
-        if not data or 'messages' not in data:
-            return jsonify(create_error_response("invalid_request", "缺少messages参数", 400)), 400
+        # 处理JSON数据
+        if chat_request is None:
+            try:
+                data = await request.json()
+                chat_request = ChatCompletionRequest(**data)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"无效的JSON数据: {str(e)}")
         
-        model = data.get('model', 'auto_chat')
-        messages = data.get('messages', [])
-        stream = data.get('stream', False)
+        model = chat_request.model
+        messages = [msg.dict() for msg in chat_request.messages]
+        stream = chat_request.stream
         
         # 处理options参数
-        options = data.get('options', {})
+        options = chat_request.options or {}
         retries = options.get('retries', 0)
         
         # 组合消息内容
         text_content = extract_text_from_messages(messages, "openai")
         
         if not text_content.strip():
-            return jsonify(create_error_response("invalid_request", "消息内容为空", 400)), 400
+            raise HTTPException(status_code=400, detail="消息内容为空")
         
         handler = get_handler()
         
         # 处理文件上传
         file_urls = []
-        form = await request.files
-        if form:
-            for file_key in form:
-                file = form[file_key]
+        if files:
+            for file in files:
                 if file.filename:
                     # 保存上传的文件
                     file_path = os.path.join(handler.temp_dir, f"{uuid.uuid4().hex}_{file.filename}")
-                    await file.save(file_path)
+                    content = await file.read()
+                    async with aiofiles.open(file_path, 'wb') as f:
+                        await f.write(content)
                     handler._add_temp_file(file_path)
                     file_urls.append(file_path)
                     temp_files.append(file_path)
@@ -1216,10 +1173,10 @@ async def chat_completions():
                             # 清理临时文件
                             handler.cleanup_temp_files(temp_files)
                     
-                    return Response(generate(), mimetype='text/plain')
+                    return StreamingResponse(generate(), media_type='text/plain')
                 else:
                     content = await handler.chat_with_specific_model(model_upper, text_content, file_urls or None, False, retries)
-                    return jsonify(create_openai_response(content, model))
+                    return create_openai_response(content, model)
             
             elif model in ['auto_chat', 'gpt-4', 'gpt-4.1'] or model.startswith("claude"):
                 # 使用回退机制
@@ -1239,23 +1196,23 @@ async def chat_completions():
                             # 清理临时文件
                             handler.cleanup_temp_files(temp_files)
                     
-                    return Response(generate(), mimetype='text/plain')
+                    return StreamingResponse(generate(), media_type='text/plain')
                 else:
                     content = await handler.chat_with_model(text_content, file_urls or None, retries)
-                    return jsonify(create_openai_response(content, model))
+                    return create_openai_response(content, model)
             
             elif model == 'auto_tts':
                 try:
-                    voice = data.get('voice', '派蒙')
+                    voice = options.get('voice', '派蒙')
                     result = await handler.chat_with_tts(text_content, voice, retries=retries)
-                    return jsonify(result)
+                    return result
                 except Exception as e:
-                    return jsonify(create_error_response("tts_error", str(e), 500)), 500
+                    raise HTTPException(status_code=500, detail=f"TTS错误: {str(e)}")
             
             elif model == 'auto_embedding':
                 try:
                     embedding = await handler.chat_with_embed(text_content, retries=retries)
-                    return jsonify({
+                    return {
                         "object": "list",
                         "data": [{
                             "object": "embedding",
@@ -1267,61 +1224,69 @@ async def chat_completions():
                             "prompt_tokens": len(text_content.split()),
                             "total_tokens": len(text_content.split())
                         }
-                    })
+                    }
                 except Exception as e:
-                    return jsonify(create_error_response("embedding_error", str(e), 500)), 500
+                    raise HTTPException(status_code=500, detail=f"嵌入错误: {str(e)}")
             
             else:
-                return jsonify(create_error_response("invalid_model", f"不支持的模型: {model}", 400)), 400
+                raise HTTPException(status_code=400, detail=f"不支持的模型: {model}")
         
         except Exception as e:
-            return jsonify(create_error_response("api_error", str(e), 500)), 500
+            raise HTTPException(status_code=500, detail=str(e))
         finally:
             # 清理临时文件
             handler.cleanup_temp_files(temp_files)
     
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"OpenAI API调用出错: {str(e)}")
-        return jsonify(create_error_response("internal_error", str(e), 500)), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.route('/v1/messages', methods=['POST'])
-async def anthropic_messages():
+@app.post("/v1/messages")
+async def anthropic_messages(
+    request: Request,
+    anthropic_request: Optional[AnthropicRequest] = None,
+    files: List[UploadFile] = File(default=[])
+):
     """Anthropic兼容的消息API - 支持多模型调用和文件处理"""
     temp_files = []
     try:
-        data = await request.get_json()
+        # 处理JSON数据
+        if anthropic_request is None:
+            try:
+                data = await request.json()
+                anthropic_request = AnthropicRequest(**data)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"无效的JSON数据: {str(e)}")
 
-        # 验证必需参数
-        if not data or 'messages' not in data:
-            return jsonify(create_error_response("invalid_request", "缺少messages参数", 400)), 400
-        
-        model = data.get('model', 'auto_chat')
-        messages = data.get('messages', [])
-        stream = data.get('stream', False)
-        max_tokens = data.get('max_tokens', 1048576)
+        model = anthropic_request.model
+        messages = [msg.dict() for msg in anthropic_request.messages]
+        stream = anthropic_request.stream
+        max_tokens = anthropic_request.max_tokens
         
         # 处理options参数
-        options = data.get('options', {})
+        options = anthropic_request.options or {}
         retries = options.get('retries', 0)
         
         # 组合消息内容
         text_content = extract_text_from_messages(messages, "anthropic")
         
         if not text_content.strip():
-            return jsonify(create_error_response("invalid_request", "消息内容为空", 400)), 400
+            raise HTTPException(status_code=400, detail="消息内容为空")
         
         handler = get_handler()
         
         # 处理文件上传
         file_urls = []
-        form = await request.files
-        if form:
-            for file_key in form:
-                file = form[file_key]
+        if files:
+            for file in files:
                 if file.filename:
                     # 保存上传的文件
                     file_path = os.path.join(handler.temp_dir, f"{uuid.uuid4().hex}_{file.filename}")
-                    await file.save(file_path)
+                    content = await file.read()
+                    async with aiofiles.open(file_path, 'wb') as f:
+                        await f.write(content)
                     handler._add_temp_file(file_path)
                     file_urls.append(file_path)
                     temp_files.append(file_path)
@@ -1353,10 +1318,10 @@ async def anthropic_messages():
                             # 清理临时文件
                             handler.cleanup_temp_files(temp_files)
                     
-                    return Response(generate(), mimetype='text/plain')
+                    return StreamingResponse(generate(), media_type='text/plain')
                 else:
                     content = await handler.chat_with_specific_model(model_upper, text_content, file_urls or None, False, retries)
-                    return jsonify(create_anthropic_response(content, model))
+                    return create_anthropic_response(content, model)
             
             elif model.startswith("claude") or model == "auto_chat":
                 # 使用回退机制
@@ -1375,25 +1340,27 @@ async def anthropic_messages():
                             # 清理临时文件
                             handler.cleanup_temp_files(temp_files)
                     
-                    return Response(generate(), mimetype='text/plain')
+                    return StreamingResponse(generate(), media_type='text/plain')
                 else:
                     content = await handler.chat_with_model(text_content, file_urls or None, retries)
-                    return jsonify(create_anthropic_response(content, model))
+                    return create_anthropic_response(content, model)
             
             else:
-                return jsonify(create_error_response("invalid_model", f"不支持的模型: {model}", 400)), 400
+                raise HTTPException(status_code=400, detail=f"不支持的模型: {model}")
         
         except Exception as e:
-            return jsonify(create_error_response("api_error", str(e), 500)), 500
+            raise HTTPException(status_code=500, detail=str(e))
         finally:
             # 清理临时文件
             handler.cleanup_temp_files(temp_files)
     
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Anthropic API调用出错: {str(e)}")
-        return jsonify(create_error_response("internal_error", str(e), 500)), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.route('/v1/models', methods=['GET'])
+@app.get("/v1/models")
 async def list_models():
     """列出可用模型 - 兼容OpenAI和Anthropic格式"""
     models = [
@@ -1534,29 +1501,28 @@ async def list_models():
         }
     ]
     
-    return jsonify({
+    return {
         "object": "list",
         "data": models
-    })
+    }
 
-@app.route('/v1/health', methods=['GET'])
+@app.get("/v1/health")
 async def health_check():
     """健康检查和统计信息"""
     handler = get_handler()
     stats = handler.get_stats()
-    return jsonify({
+    return {
         "status": "healthy",
         "timestamp": int(time.time()),
         "stats": stats
-    })
+    }
 
-@app.route('/', methods=['GET'])
+@app.get("/")
 async def index():
     """根路径 - API文档和功能介绍"""
-    return jsonify({
+    return {
         "message": "OpenAI & Anthropic Compatible API - Multimodal Support with Direct Model Access",
-        "version": "2.2.0-vercel",
-        "platform": "Vercel Deployment",
+        "version": "2.2.0",
         "endpoints": {
             "openai_chat": "/v1/chat/completions",
             "anthropic_messages": "/v1/messages",
@@ -1626,31 +1592,12 @@ async def index():
         "file_formats": {
             "openai": "file_url (new) or image_url (legacy)",
             "anthropic": "image/video/audio/document with url or base64"
-        },
-        "deployment_info": {
-            "platform": "Vercel",
-            "runtime": "Python + Quart ASGI",
-            "temp_dir": "/tmp",
-            "import_fallback": "Enabled"
         }
-    })
+    }
 
-@app.errorhandler(404)
-async def not_found(error):
-    return jsonify(create_error_response("not_found", "接口不存在", 404)), 404
+# Vercel 需要的应用实例
+handler = app
 
-@app.errorhandler(500)
-async def internal_error(error):
-    return jsonify(create_error_response("internal_error", "服务器内部错误", 500)), 500
-
-# Vercel 函数入口点
-def handler_func(request):
-    """Vercel 函数处理器"""
-    return app
-
-# 如果直接运行则启动开发服务器
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=False)
-
-# 导出应用实例供 Vercel 使用
-application = app
+    import uvicorn
+    uvicorn.run(app, host='0.0.0.0', port=8000)

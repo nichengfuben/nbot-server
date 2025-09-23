@@ -42,7 +42,7 @@ run_command('git commit -m "初始提交"', "提交更改")
 run_command("git branch -M main", "重命名分支为main")
 
 # 6. 检查并配置远程仓库
-returncode, output = run_command("git remote -v", "检查远程仓库配置")
+returncode, output = run_command("git remote -v -y", "检查远程仓库配置")
 
 if "origin" in output:
     choice = input("远程仓库origin已存在，是否移除? (y/n): ")

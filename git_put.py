@@ -4,11 +4,11 @@ import os
 os.chdir(r"E:\我的\python\new\MODEL - SERVER")
 
 commands = [
-    "git remote add origin https://github.com/nichengfuben/nbot_api.git",
     "git init",
     "git add .",
     "git commit -m \"first commit\"",
     "git branch -M main",
+    "git remote add origin https://github.com/nichengfuben/nbot_api.git",
     "git push -u origin main"
 ]
 

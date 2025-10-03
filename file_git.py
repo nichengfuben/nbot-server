@@ -138,7 +138,7 @@ def git_push():
         branch = "main"
     else:
         branch = branch_result.stdout.strip()
-    
+    branch = "main"    
     print(f"   分支: {branch}")
     
     # 尝试推送

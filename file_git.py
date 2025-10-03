@@ -167,10 +167,8 @@ def git_push():
 
 def main():
     """主函数"""
-    print("=" * 60)
     print(" Git 自动推送脚本")
     print(f" 目标: {REPO_URL}")
-    print("=" * 60 + "\n")
     
     # 执行步骤
     steps = [
@@ -193,9 +191,7 @@ def main():
             print(f"   {str(e)}")
             sys.exit(1)
     
-    print("\n" + "=" * 60)
     print(" 所有操作完成!")
-    print("=" * 60)
 
 if __name__ == "__main__":
     try:

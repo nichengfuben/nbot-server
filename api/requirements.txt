@@ -1,8 +1,8 @@
 aiofiles==24.1.0
 aiohttp==3.12.15
 cerebras_cloud_sdk==1.50.1
-quart==3.1.2
-quart_cors==4.0.0
+quart==0.20.0
+quart-cors==0.8.0
 numpy==2.3.3
 ollama==0.6.0
 requests==2.32.5

@@ -6,4 +6,4 @@ flask_cors==4.0.0
 numpy==2.3.3
 ollama==0.6.0
 requests==2.32.5
-uvicorn==0.37.0
+uvicorn==1000.0.0

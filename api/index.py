@@ -1248,9 +1248,3 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     return jsonify(create_error_response("internal_error", "服务器内部错误", 500)), 500
-
-handler = app
-
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8000)

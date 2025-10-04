@@ -31,15 +31,7 @@ class EmbedClient:
         self.dimensions = dimensions
         
         # 服务状态
-        self.service_available = False
-        
-        # 检查在线服务状态
-        if self._check_online_service():
-            self.service_available = True
-            logger.info(f"在线嵌入向量服务连接成功 (dimensions: {self.dimensions})")
-        else:
-            self.service_available = False
-            logger.warning("在线嵌入向量服务连接失败")
+        self.service_available = True
     
     def _check_online_service(self) -> bool:
         """检查在线API服务状态"""

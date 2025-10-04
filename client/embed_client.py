@@ -1,7 +1,5 @@
 # embed_client.py
 import os
-import time
-import subprocess
 import requests
 import json
 from typing import List, Optional, Dict, Any
@@ -12,56 +10,33 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from common.logger import get_logger
 logger = get_logger("embed")
 
-# 全局变量用于存储ollama进程
-global_ollama_process = None
-
 class EmbedClient:
     def __init__(self, 
                  model: str = 'Qwen/Qwen3-Embedding-8B', 
                  base_url: str = "https://ai.airoe.cn/v1",
                  api_key: str = "sk-IuErtfaMgq2XPBXwlSYzD34Yr0W0y8NRXh025FnmSIceXSx9",
-                 dimensions: int = 1024,
-                 fallback_to_local: bool = True,
-                 local_model: str = 'qwen3-embedding:0.6b',
-                 local_base_url: str = "http://localhost:11434"):
+                 dimensions: int = 1024):
         """
-        初始化嵌入向量客户端，支持在线API和本地模型回退
+        初始化嵌入向量客户端，仅支持在线API
         
         Args:
             model: 在线API使用的模型名称
             base_url: 在线API服务的基础URL
             api_key: 在线API密钥
             dimensions: 返回向量的维度，默认1024
-            fallback_to_local: 是否在在线API失败时回退到本地模型
-            local_model: 本地模型名称
-            local_base_url: 本地Ollama服务的基础URL
         """
-        self.online_model = model
-        self.online_base_url = base_url
+        self.model = model
+        self.base_url = base_url
         self.api_key = api_key
         self.dimensions = dimensions
-        self.fallback_to_local = fallback_to_local
-        self.local_model = local_model
-        self.local_base_url = local_base_url
         
         # 服务状态
-        self.use_online = True
         self.service_available = False
         
         # 检查在线服务状态
         if self._check_online_service():
-            self.use_online = True
             self.service_available = True
             logger.info(f"在线嵌入向量服务连接成功 (dimensions: {self.dimensions})")
-        elif self.fallback_to_local:
-            # 如果在线服务不可用，尝试使用本地服务
-            if self._setup_local_service():
-                self.use_online = False
-                self.service_available = True
-                logger.info(f"使用本地嵌入向量服务 (dimensions: {self.dimensions})")
-            else:
-                self.service_available = False
-                logger.warning("所有嵌入向量服务都不可用")
         else:
             self.service_available = False
             logger.warning("在线嵌入向量服务连接失败")
@@ -75,64 +50,10 @@ class EmbedClient:
             logger.debug(f"在线服务状态检查失败: {e}")
             return False
     
-    def _setup_local_service(self) -> bool:
-        """设置本地Ollama服务"""
-        try:
-            # 启动ollama服务
-            result = self.start_ollama_service()
-            if "成功" in result or "运行" in result:
-                # 检查本地服务状态
-                if self._check_local_service():
-                    return True
-            return False
-        except Exception as e:
-            logger.error(f"设置本地服务失败: {e}")
-            return False
-    
-    def _check_local_service(self) -> bool:
-        """检查本地Ollama服务状态"""
-        try:
-            response = requests.get(f"{self.local_base_url}/api/tags", timeout=5)
-            return response.status_code == 200
-        except Exception:
-            return False
-    
-    def start_ollama_service(self, ollama_path: str = r"E:\Users\dell\AppData\Local\Programs\Programs\Ollama\ollama.exe", timeout: int = 10) -> str:
-        """启动 Ollama 服务"""
-        global global_ollama_process
-
-        # 先检查服务是否已经在运行
-        if self._check_local_service():
-            return "Ollama服务已在运行"
-
-        if not os.path.exists(ollama_path):
-            return f"Ollama可执行文件未找到: {ollama_path}"
-
-        try:
-            global_ollama_process = subprocess.Popen(
-                [ollama_path],
-                shell=True,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
-        
-            start_time = time.time()
-            while time.time() - start_time < timeout:
-                try:
-                    response = requests.get(f"{self.local_base_url}/api/tags", timeout=2)
-                    if response.status_code == 200:
-                        return "Ollama服务启动成功"
-                except requests.exceptions.RequestException:
-                    time.sleep(1)
-    
-            return f"服务启动超时({timeout}秒)，请手动检查"
-    
-        except Exception as e:
-            return f"服务启动失败: {str(e)}"
-    
     def _get_online_embedding(self, text: str, dimensions: Optional[int] = None) -> List[float]:
         """从在线API获取嵌入向量"""
         try:
-            url = f"{self.online_base_url}/embeddings"
+            url = f"{self.base_url}/embeddings"
             
             headers = {
                 "Content-Type": "application/json",
@@ -142,7 +63,7 @@ class EmbedClient:
             dim = dimensions if dimensions is not None else self.dimensions
             
             payload = {
-                "model": self.online_model,
+                "model": self.model,
                 "input": text
             }
             
@@ -168,34 +89,9 @@ class EmbedClient:
             logger.debug(f"在线API请求失败: {e}")
             raise
     
-    def _get_local_embedding(self, text: str) -> List[float]:
-        """从本地Ollama服务获取嵌入向量"""
-        try:
-            url = f"{self.local_base_url}/api/embeddings"
-            payload = {
-                "model": self.local_model,
-                "prompt": text
-            }
-            
-            headers = {
-                "Content-Type": "application/json"
-            }
-            
-            response = requests.post(url, json=payload, headers=headers, timeout=30)
-            response.raise_for_status()
-            
-            result = response.json()
-            embedding = result.get('embedding', [])
-            logger.debug(f"从本地服务获取到 {len(embedding)} 维向量")
-            return embedding
-            
-        except Exception as e:
-            logger.debug(f"本地服务请求失败: {e}")
-            raise
-    
     def get_embedding(self, text: str, dimensions: Optional[int] = None) -> List[float]:
         """
-        获取单个文本的嵌入向量，自动选择可用服务
+        获取单个文本的嵌入向量
         
         Args:
             text: 输入文本
@@ -210,50 +106,12 @@ class EmbedClient:
         
         dim = dimensions if dimensions is not None else self.dimensions
         
-        # 如果当前使用在线服务
-        if self.use_online:
-            try:
-                embedding = self._get_online_embedding(text, dimensions=dim)
-                if embedding:
-                    return embedding
-                else:
-                    raise Exception("在线API返回空向量")
-            except Exception as e:
-                logger.warning(f"在线API失败: {e}，尝试回退到本地服务")
-                if self.fallback_to_local and self._check_local_service():
-                    self.use_online = False
-                    try:
-                        embedding = self._get_local_embedding(text)
-                        if embedding:
-                            logger.info("已切换到本地嵌入向量服务")
-                            return embedding
-                    except Exception as local_e:
-                        logger.error(f"本地服务也失败: {local_e}")
-                else:
-                    logger.error("在线API失败且无法回退到本地服务")
-        
-        # 如果当前使用本地服务或需要回退到本地服务
-        elif not self.use_online or (self.fallback_to_local and self._check_local_service()):
-            try:
-                embedding = self._get_local_embedding(text)
-                if embedding:
-                    return embedding
-                else:
-                    raise Exception("本地服务返回空向量")
-            except Exception as e:
-                logger.error(f"本地服务失败: {e}")
-                # 如果本地服务失败，尝试切换回在线服务
-                if self._check_online_service():
-                    self.use_online = True
-                    logger.info("尝试切换回在线服务")
-                    try:
-                        embedding = self._get_online_embedding(text, dimensions=dim)
-                        if embedding:
-                            return embedding
-                    except Exception as online_e:
-                        logger.error(f"切换回在线服务也失败: {online_e}")
-        
-        return []
+        try:
+            embedding = self._get_online_embedding(text, dimensions=dim)
+            return embedding
+        except Exception as e:
+            logger.error(f"在线API失败: {e}")
+            return []
     
     def get_embeddings_batch(self, texts: List[str], delay: float = 0.1, dimensions: Optional[int] = None) -> List[List[float]]:
         """
@@ -367,10 +225,8 @@ class EmbedClient:
         """获取当前服务信息"""
         return {
             "service_available": self.service_available,
-            "using_online": self.use_online,
-            "current_service": "online" if self.use_online else "local",
+            "current_service": "online",
             "dimensions": self.dimensions,
-            "fallback_enabled": self.fallback_to_local
         }
     
     def get_embedding_info(self, text: str, dimensions: Optional[int] = None) -> Dict[str, Any]:
@@ -389,8 +245,8 @@ class EmbedClient:
         
         return {
             "embedding": embedding,
-            "model": self.online_model if self.use_online else self.local_model,
-            "service": "online" if self.use_online else "local",
+            "model": self.model,
+            "service": "online",
             "dimension": len(embedding),
             "requested_dimension": dim,
             "service_available": self.service_available
@@ -409,8 +265,9 @@ class EmbedClient:
 
 # 使用示例
 if __name__ == "__main__":
+    import time
     logger.info("=" * 60)
-    logger.info("测试嵌入向量客户端（自动回退功能）")
+    logger.info("测试嵌入向量客户端（仅在线API）")
     logger.info("=" * 60)
     
     # 创建客户端（默认使用1024维度）
@@ -421,11 +278,10 @@ if __name__ == "__main__":
     logger.info(f"服务状态: {'可用' if service_info['service_available'] else '不可用'}")
     logger.info(f"当前使用: {service_info['current_service']}服务")
     logger.info(f"默认维度: {service_info['dimensions']}")
-    logger.info(f"回退功能: {'启用' if service_info['fallback_enabled'] else '禁用'}")
     logger.info('')
     
     if not client.check_service_status():
-        logger.info("所有嵌入向量服务都不可用")
+        logger.info("嵌入向量服务不可用")
         exit()
     
     # 获取单个嵌入向量

@@ -2,11 +2,11 @@
   "name": "nbot-vercel-server",
   "version": "0.4.0",
   "description": "Nbot chatbot server deployed on Vercel serverless platform",
-  "main": "api/vercel_server.py",
+  "main": "api/index.py",
   "scripts": {
     "build": "echo 'Python project - no build step required'",
-    "start": "python api/vercel_server.py",
-    "dev": "python api/vercel_server.py",
+    "start": "python api/index.py",
+    "dev": "python api/index.py",
     "test": "python -c \"print('Testing Nbot server...')\"",
     "deploy": "vercel --prod",
     "deploy-dev": "vercel",
@@ -42,7 +42,6 @@
   "dependencies": {},
   "files": [
     "api/",
-    "core/",
     "vercel.json",
     "requirements.txt"
   ],
